@@ -1,0 +1,22 @@
+namespace: /prometheus
+prometheus:
+  defines: runnable
+  containers:
+    defines: containers
+    prometheus:
+      user: root
+      paths:
+      - <- `${moncc-volume-path}/prometheus:/data`
+      image-tag: latest
+      entrypoint: <- `/entrypoint.sh ${target-nodes}`
+      ports:
+      - 0.0.0.0:9090:9090
+      image: prom/prometheus
+  variables:
+    defines: variables
+    target-nodes:
+      value: ""
+      type: string
+    node-port:
+      value: 9615
+      type: int

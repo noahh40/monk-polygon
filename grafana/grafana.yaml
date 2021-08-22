@@ -1,0 +1,22 @@
+namespace: /grafana
+latest:
+  defines: runnable
+  containers:
+    defines: containers
+    grafana:
+      image: grafana/grafana
+      image-tag: <- `${image-tag}`
+      paths:
+      - <- `${monk-volume-path}/grafana/provisioning:/etc/grafana/provisioning`
+      - <- `${monk-volume-path}/grafana/dashboards:/var/lib/grafana/dashboards`
+      - <- `${monk-volume-path}/grafana/data:/var/lib/grafana`
+      ports:
+      - 3000:3000
+  variables:
+    defines: variables
+    plugins:
+      value: grafana-clock-panel,grafana-simple-json-datasource
+      type: string
+    image-tag:
+      type: string
+      value: latest-ubuntu

@@ -1,0 +1,210 @@
+namespace: polygon
+
+heimdall:
+  defines: runnable
+  containers:
+    defines: containers
+    heimdall:
+      image: gcr.io/monk-releases/maticnetwork/heimdall:fix
+      bash:  /root/run.sh
+      ports:
+        - <- `${p2p-port}:${p2p-port}`
+      paths:
+        - <- `${monk-volume-path}/heimdall:/root/.heimdalld`
+    rest:
+      image: gcr.io/monk-releases/maticnetwork/heimdall:fix
+      bash: /root/run.sh
+      ports:
+        - <- `${rest-port}:${rest-port}`  
+      paths:
+        - <- `${monk-volume-path}/heimdall:/root/.heimdalld`
+  files:
+    defines: files
+    run:
+      container: heimdall
+      mode: 0755
+      path: /root/run.sh
+      contents: |
+        set -x
+        if ! [ -f /root/.heimdalld/snapshot_downloaded ]; then
+          wget {{ v "snapshot_url" }} -O /tmp/snapshot.tar.gz
+          mkdir -p /root/.heimdalld/data
+          tar -xz -f /tmp/snapshot.tar.gz -C /root/.heimdalld/data
+          rm /tmp/snapshot.tar.gz
+          touch /root/.heimdalld/snapshot_downloaded
+          heimdalld init
+          wget {{ v "genesis_url" }} -O /root/.heimdalld/config/genesis.json
+        fi
+        sed -i 's#cors_allowed_origins = \[\]#cors_allowed_origins = \["*"\]#' /root/.heimdalld/config/config.toml
+        sed -i 's#seeds = ""#seeds = "4cd60c1d76e44b05f7dfd8bab3f447b119e87042@54.147.31.250:26656"#' /root/.heimdalld/config/config.toml
+        sed -i 's#amqp_url = "amqp://guest:guest@localhost:5672/"#amqp_url = "amqp://guest:guest@rabbitmq:5672"#' /root/.heimdalld/config/heimdall-config.toml
+        sed -i 's#laddr = "tcp://127.0.0.1:26657"#laddr = "tcp://0.0.0.0:26657"#' /root/.heimdalld/config/config.toml
+        touch /root/.heimdalld/config/init
+        heimdalld start \
+          --p2p.laddr=tcp://0.0.0.0:{{ v "p2p-port" }} \
+          --rpc.laddr=tcp://0.0.0.0:{{ v "rpc-port" }}
+    run-rest:
+      container: rest
+      mode: 0755
+      path: /root/run.sh
+      contents: |
+        while ! [ -f /root/.heimdalld/config/init ]; do
+          echo "waiting for heimdalld init..."
+          sleep 1
+        done
+        heimdalld rest-server \
+          --chain-id={{ v "chain-id" }} \
+          --laddr=tcp://0.0.0.0:{{ v "rest-port" }} \
+          --node=tcp://{{ v "p2p-host" }}:{{ v "rpc-port" }}
+
+
+  variables:
+    defines: variables
+    genesis_url: https://raw.githubusercontent.com/maticnetwork/launch/master/testnet-v4/sentry/sentry/heimdall/config/genesis.json
+    snapshot_url: https://matic-blockchain-snapshots.s3-accelerate.amazonaws.com/matic-mumbai/heimdall-snapshot-2021-08-16.tar.gz
+    chain-id: heimdall-80001
+    p2p-host:
+      type: string
+      value: <- get-hostname("polygon/heimdall", "heimdall")
+    rest-port: 1317
+    p2p-port: 26656
+    rpc-port: 26657
+    seeds: "4cd60c1d76e44b05f7dfd8bab3f447b119e87042@54.147.31.250:26656"
+    amqp_url: "amqp://guest:guest@rabbitmq:5672"
+    eth_rpc_url: "https://polygon-mumbai.infura.io/v3/84495ec72d3d493c98b35fcfb4e9bad8"
+  check:
+    defines: checks
+    readiness: 
+    # we have an error check because the get might get bounced due to a default timeout so this will pass no matter what 
+      code: http-get("http://localhost:26657/status") parse-json get-member("result") get-member("sync_info") get-member("catching_up") if-error(true) not
+      period: 10
+      initialDelay: 10
+
+rabbitmq:
+  defines: runnable
+  containers:
+    defines: containers
+    rabbitmq:
+      image: rabbitmq:latest
+      ports:
+        - "5672:5672"
+      
+heimdall-prometheus:
+  deines: runnable
+  inherits: prometheus
+  variables:
+    <- get-hostname("polygon/heimdall", "node") `:${node-port}` concat-all
+
+heimdall-grafana:
+  defines: runnable
+  inherits: grafana
+  variables:
+    prometheus-endpoint: <- "http://" get-hostname("polygon/heimdall-prometheus", "prometheus") ":9090" concat-all
+
+heimdall-node:
+  defines: process-group
+
+  balancers:
+        defines: balancers
+        app-balancer:
+            type: http
+            health-check:
+                kind: http
+                url: /index.html
+                request: "request body"
+                interval: 30
+                response: "expected response" 
+            port: 
+                - 80
+            instances:
+                - polygon/heimdall
+                - polygon/rabbitmq
+
+  runnable-list:
+    - ./heimdall
+    - ./rabbitmq
+    - ./heimdall-prometheus
+    - ./heimdall-grafana
+
+bor:
+  defines: runnable
+  containers:
+    defines: containers
+    bor:
+      image: maticnetwork/bor:v0.2.6
+      bash: /root/run.sh
+      ports:
+        - <- `${http-port}:${http-port}`
+        - <- `${port}:${port}`
+      paths:
+        - <- `${monk-volume-path}/bor:/root/.bor`
+  files:
+    defines: files
+    run:
+      container: bor
+      mode: 0755
+      path: /root/run.sh
+      contents: |
+        set -x 
+        if ! [ -f /root/.bor/snapshot_downloaded ]; then
+          wget {{ v "snapshot_url" }} -O /tmp/snapshot.tar.gz
+          tar -xz -f /tmp/snapshot.tar.gz -C /root/.bor/data/bor/chaindata
+          rm  /tmp/snapshot.tar.gz
+          touch /root/.bor/snapshot_downloaded
+          wget {{ v "genesis_url" }} -O ./genesis.json
+          bor --datadir /root/.bor/data init ./genesis.json
+        fi
+        bor --datadir /root/.bor/data \
+          --bor.heimdall=http://{{ v "heimdall-host" }}:1317 \
+          --networkid={{ v "networkid" }} \
+          --miner.gaslimit=200000000 \
+          --miner.gastarget=20000000 \
+          --syncmode=full \
+          --http \
+          --http.addr=0.0.0.0 \
+          --http.port={{ v "http-port" }} \
+          --http.api=eth,net,web3,admin,debug,bor \
+          --http.corsdomain=* \
+          --http.vhosts=* \
+          --port={{ v "port" }} \
+          --bootnodes {{ v "bootnodes" }} 
+  variables:
+    defines: variables
+    genesis_url: https://raw.githubusercontent.com/maticnetwork/launch/master/testnet-v4/sentry/sentry/bor/genesis.json
+    snapshot_url: https://matic-blockchain-snapshots.s3-accelerate.amazonaws.com/matic-mumbai/bor-fullnode-snapshot-2021-06-30.tar.gz
+    bootnodes: "enode://320553cda00dfc003f499a3ce9598029f364fbb3ed1222fdc20a94d97dcc4d8ba0cd0bfa996579dcc6d17a534741fb0a5da303a90579431259150de66b597251@54.147.31.250:30303,enode://f0f48a8781629f95ff02606081e6e43e4aebd503f3d07fc931fad7dd5ca1ba52bd849a6f6c3be0e375cf13c9ae04d859c4a9ae3546dc8ed4f10aa5dbb47d4998@34.226.134.117:30303,enode://43b9003dd03cfe2032f52e72a27681904611e8b7f49879f4f314807f041c0009cb9058b3f1cc4d3daaa23d18d48fe7f16d03d2405089c938365617ccbb29730d@54.211.245.52:30303,enode://5fd33505c51dc91f181875a0f8c9e5386ea1bec3d19a03b8ce8cb64dee18b5c511133a3d5de19dce11e7968808d8f2bcbcdc66e828a5b575a69de3b6b654f162@54.84.215.227:30303,enode://0884422c6bea61259adfb47d05dc73d86e046b2556eb9ed3082301b4311b6c1b28d4a4ca9a9d38144f4e61005fe32c3a99e3c92d23794e01883434826a22d83d@34.197.83.153:30303,enode://f7b2b98d411e8940cae3db8c23cd4288321b4309670feec870450e286c8a9b62b5ca95a7a20fe8d056ddae57e40c2a7a19851904f4231e0a9710e16ad71587e9@54.237.61.33:30303,enode://e3f5a660b9bc633815ccf507a4eed53a96cdd2976dd951e0ac70fa0b4b803134a681801bb2a25ea8db1d39f90f4ab3684a905629e86fece7cccb1d7dd013c9e0@18.214.246.244:30303"
+    networkid: 80001
+    port: 30303
+    http-port: 8545
+    heimdall-port: 1317
+    heimdall-host:
+      type: string
+      value: <- get-hostname("polygon/heimdall", "rest")
+  # depends:
+  #   defines: depends
+  #   wait-for:
+  #     timeout: 28800
+  #     runnables:
+  #       - ./node/heimdall
+  #       - ./node/rabbitmq
+
+bor-node:
+  defines: process-group
+
+  # balancers:
+  #     defines: balancers
+  #     app-balancer:
+  #       type: http
+  #       health-check:
+  #               kind: http
+  #               url: /index.html
+  #               request: ""
+  #               interval: 30
+  #               response: ""
+  #         port: 
+  #             - 80
+  #       instances: 
+  #           - polygon/bor
+
+  runnable-list:
+    - ./bor
