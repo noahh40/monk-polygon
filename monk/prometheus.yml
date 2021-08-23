@@ -22,6 +22,9 @@ prometheus:
       image-tag: latest
       ports:
         - 3000:3000
+      paths:
+        - <- `${monk-volume-path}/prometheus:/root/.heimdalld/data`
+        - <- `${monk-volume-path}/prometheus:/root/.heimdalld/data`
       volumes:
         - ./provisioning:/etc/grafana/provisioning
         - ./dashboards:/var/lib/grafana/dashboards

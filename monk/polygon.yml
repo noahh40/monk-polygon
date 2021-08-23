@@ -94,7 +94,7 @@ heimdall-prometheus:
   deines: runnable
   inherits: polygon/prometheus
   variables:
-    <- get-hostname("polygon/heimdall", "node") `:${node-port}` concat-all
+    <- get-hostname("polygon/heimdall", "heimdall") `:${node-port}` concat-all
 
 heimdall-grafana:
   defines: runnable
