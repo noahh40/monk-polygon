@@ -1,0 +1,10 @@
+namespace: polygon
+
+node-exporter:
+  defines: runnable
+  containers:
+    defines: containers
+    node-exporter:
+    image: prom/node-exporter
+    ports:
+      - 9100:9100

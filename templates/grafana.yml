@@ -1,0 +1,14 @@
+namespace: polygon
+
+grafana:
+  defines: runnable
+  containers:
+    defines: containers
+    grafana:
+      image: grafana/grafana:latest
+      ports:
+        - 3000:3000
+      paths:
+        - <- `${monk-volume-path}/provisioning:/root/.heimdalld/data`
+        - <- `${monk-volume-path}/dashboards:/root/.heimdalld/data`
+  
