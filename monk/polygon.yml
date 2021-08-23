@@ -91,13 +91,13 @@ rabbitmq:
       
 heimdall-prometheus:
   deines: runnable
-  inherits: prometheus
+  inherits: polygon/prometheus
   variables:
     <- get-hostname("polygon/heimdall", "node") `:${node-port}` concat-all
 
 heimdall-grafana:
   defines: runnable
-  inherits: grafana
+  inherits: polygon/grafana
   variables:
     prometheus-endpoint: <- "http://" get-hostname("polygon/heimdall-prometheus", "prometheus") ":9090" concat-all
 
@@ -123,8 +123,8 @@ heimdall-node:
   runnable-list:
     - ./heimdall
     - ./rabbitmq
-    - ./heimdall-prometheus
-    - ./heimdall-grafana
+    - polygon/heimdall-prometheus
+    - polygon/heimdall-grafana
 
 bor:
   defines: runnable
@@ -187,6 +187,18 @@ bor:
   #     runnables:
   #       - ./node/heimdall
   #       - ./node/rabbitmq
+
+bor-prometheus:
+  deines: runnable
+  inherits: polygon/prometheus
+  variables:
+    <- get-hostname("polygon/bor", "node") `:${node-port}` concat-all
+
+bor-grafana:
+  defines: runnable
+  inherits: polygon/grafana
+  variables:
+    prometheus-endpoint: <- "http://" get-hostname("polygon/bor-prometheus", "prometheus") ":9090" concat-all
 
 bor-node:
   defines: process-group

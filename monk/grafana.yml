@@ -1,5 +1,5 @@
-namespace: /grafana
-latest:
+namespace: polygon
+grafana:
   defines: runnable
   containers:
     defines: containers

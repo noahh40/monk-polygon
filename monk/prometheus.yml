@@ -1,4 +1,4 @@
-namespace: /prometheus
+namespace: polygon
 prometheus:
   defines: runnable
   containers:
