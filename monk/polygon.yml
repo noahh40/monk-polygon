@@ -39,6 +39,7 @@ heimdall:
         sed -i 's#seeds = ""#seeds = "4cd60c1d76e44b05f7dfd8bab3f447b119e87042@54.147.31.250:26656"#' /root/.heimdalld/config/config.toml
         sed -i 's#amqp_url = "amqp://guest:guest@localhost:5672/"#amqp_url = "amqp://guest:guest@rabbitmq:5672"#' /root/.heimdalld/config/heimdall-config.toml
         sed -i 's#laddr = "tcp://127.0.0.1:26657"#laddr = "tcp://0.0.0.0:26657"#' /root/.heimdalld/config/config.toml
+        sed -i 's#prometheus = false#prometheus = true' /root/.heimdalld/config/config.toml
         touch /root/.heimdalld/config/init
         heimdalld start \
           --p2p.laddr=tcp://0.0.0.0:{{ v "p2p-port" }} \
@@ -167,6 +168,8 @@ bor:
           --http.corsdomain=* \
           --http.vhosts=* \
           --port={{ v "port" }} \
+          --metrics \
+          --pprof --pprofport 7071 --pprofaddr '0.0.0.0' \
           --bootnodes {{ v "bootnodes" }} 
   variables:
     defines: variables
