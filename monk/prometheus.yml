@@ -6,12 +6,27 @@ prometheus:
     prometheus:
       user: root
       paths:
-      - <- `${moncc-volume-path}/prometheus:/data`
+        - <- `${monk-volume-path}/prometheus:/root/.heimdalld`
       image-tag: latest
-      entrypoint: <- `/entrypoint.sh ${target-nodes}`
+      network_mode: host
       ports:
-      - 0.0.0.0:9090:9090
+        - 9090:9090
       image: prom/prometheus
+    node-exporter:
+      image: prom/node-exporter
+      network_mode: host
+      ports:
+        - 9100:9100
+    grafana:
+      image: grafana/grafana
+      image-tag: latest
+      ports:
+        - 3000:3000
+      volumes:
+        - ./provisioning:/etc/grafana/provisioning
+        - ./dashboards:/var/lib/grafana/dashboards
+  
+  
   variables:
     defines: variables
     target-nodes:
@@ -20,3 +35,4 @@ prometheus:
     node-port:
       value: 9615
       type: int
+
