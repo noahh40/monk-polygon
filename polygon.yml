@@ -9,7 +9,6 @@ heimdall:
       bash:  /root/run.sh
       ports:
         - <- `${p2p-port}:${p2p-port}`
-        - <- `0.0.0.0:${prometheus-port}:${prometheus-port}`
       paths:
         - <- `${monk-volume-path}/heimdall:/root/.heimdalld`
     rest:
@@ -40,7 +39,7 @@ heimdall:
         sed -i 's#seeds = ""#seeds = "4cd60c1d76e44b05f7dfd8bab3f447b119e87042@54.147.31.250:26656"#' /root/.heimdalld/config/config.toml
         sed -i 's#amqp_url = "amqp://guest:guest@localhost:5672/"#amqp_url = "amqp://guest:guest@rabbitmq:5672"#' /root/.heimdalld/config/heimdall-config.toml
         sed -i 's#laddr = "tcp://127.0.0.1:26657"#laddr = "tcp://0.0.0.0:26657"#' /root/.heimdalld/config/config.toml
-        sed -i 's#prometheus = false#prometheus = true' /root/.heimdalld/config/config.toml
+        sed -i 's#prometheus = false#prometheus = true#' /root/.heimdalld/config/config.toml
         touch /root/.heimdalld/config/init
         heimdalld start \
           --p2p.laddr=tcp://0.0.0.0:{{ v "p2p-port" }} \
@@ -91,42 +90,6 @@ rabbitmq:
       ports:
         - "5672:5672"
       
-# heimdall-prometheus:
-#   deines: runnable
-#   inherits: ./prometheus
-#   variables:
-#     <- get-hostname("polygon/heimdall", "heimdall") `:${node-port}` concat-all
-
-# heimdall-grafana:
-#   defines: runnable
-#   inherits: ./grafana
-#   variables:
-#     prometheus-endpoint: <- "http://" get-hostname("polygon/heimdall-prometheus", "prometheus") ":9090" concat-all
-
-heimdall-node:
-  defines: process-group
-
-  # balancers:
-  #       defines: balancers
-  #       app-balancer:
-  #           type: http
-  #           health-check:
-  #               kind: http
-  #               url: /index.html
-  #               request: "request body"
-  #               interval: 30
-  #               response: "expected response" 
-  #           port: 
-  #               - 80
-  #           instances:
-  #               - polygon/heimdall
-
-  runnable-list:
-    - ./heimdall
-    - ./rabbitmq
-    # - ./heimdall-prometheus
-    # - ./heimdall-grafana
-
 bor:
   defines: runnable
   containers:
@@ -183,45 +146,17 @@ bor:
     heimdall-host:
       type: string
       value: <- get-hostname("polygon/heimdall", "rest")
-  # depends:
-  #   defines: depends
-  #   wait-for:
-  #     timeout: 28800
-  #     runnables:
-  #       - ./node/heimdall
-  #       - ./node/rabbitmq
+  depends:
+    defines: depends
+    wait-for:
+      timeout: 28800
+      runnables:
+        - polygon/heimdall
+        - polygon/rabbitmq
 
-# bor-prometheus:
-#   deines: runnable
-#   inherits: ./prometheus
-#   variables:
-#     <- get-hostname("polygon/bor", "node") `:${node-port}` concat-all
-
-# bor-grafana:
-#   defines: runnable
-#   inherits: ./grafana
-#   variables:
-#     prometheus-endpoint: <- "http://" get-hostname("polygon/bor-prometheus", "prometheus") ":9090" concat-all
-
-bor-node:
+node:
   defines: process-group
-
-  # balancers:
-  #     defines: balancers
-  #     app-balancer:
-  #       type: http
-  #       health-check:
-  #               kind: http
-  #               url: /index.html
-  #               request: ""
-  #               interval: 30
-  #               response: ""
-  #         port: 
-  #             - 80
-  #       instances: 
-  #           - polygon/bor
-
   runnable-list:
-    - ./bor
-    # - ./bor-grafana
-    # - ./bor-prometheus
+    - polygon/heimdall
+    - polygon/rabbitmq
+    - polygon/bor

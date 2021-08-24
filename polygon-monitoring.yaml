@@ -1,0 +1,122 @@
+namespace: polygon
+
+# note that this makes little sense in this node-exporter
+# * node-exporter should not generally be run in docker container
+# * if it is running in a docker container it needs some specific config
+# * original docker-compose is missing this specific config anyway
+# * node-exporter should run on every machine
+node-exporter:
+  defines: runnable
+  containers:
+    defines: containers
+    node-exporter:
+      image: prom/node-exporter:latest
+      ports:
+        - 9100:9100
+
+prometheus:
+  defines: runnable
+  containers:
+    defines: containers
+    prometheus:
+      image: prom/prometheus:latest
+      # ports:
+      #  - 9090:9090 # this is probably not needed since grafana will connect to prometheus via overlay
+  # I added these vars instead of hardcoding everything in prometheus.yml
+  variables:
+    defines: variables
+    node-exporter-addr:
+      type: string
+      value: <- get-hostname("polygon/node-exporter", "node-exporter")
+    heimdall-addr:
+      type: string
+      value: <- get-hostname("polygon/heimdall", "heimdall")
+    bor-addr:
+      type: string
+      value: <- get-hostname("polygon/bor", "bor")
+  files:
+    defines: files
+    prometheus-config:
+      container: prometheus
+      path: /etc/prometheus/prometheus.yml
+      mode: 0777
+      # contents of the prometheus.yml from the repo:
+      contents: |
+        global:
+          scrape_interval: 10s
+        scrape_configs:
+          - job_name: 'node-exporter'
+            scrape_interval: 10s
+            static_configs:
+            - targets: ['{{ v "node-exporter-addr" }}:9100']
+          - job_name: 'heimdall'
+            scrape_interval: 10s
+            static_configs:
+            - targets: ['{{ v "heimdall-addr" }}:26660']
+          - job_name: 'bor'
+            scrape_interval: 10s
+            scrape_timeout: 10s
+            metrics_path: /debug/metrics/prometheus
+            scheme: http
+            static_configs:
+            - targets: ['{{ v "bor-addr" }}:7071']
+
+grafana:
+  defines: runnable
+  containers:
+    defines: containers
+    grafana:
+      image: grafana/grafana:latest
+      ports:
+        - 3000:3000
+      paths:
+        - <- `${monk-volume-path}/grafana:/var/lib/grafana`
+  variables:
+    defines: variables
+    prometheus-addr:
+      type: string
+      value: <- get-hostname("polygon/prometheus", "prometheus")
+  files:
+    defines: files
+    provisioning-dashboards:
+      container: grafana
+      path: /etc/grafana/provisioning/dashboards/dashboards.yaml
+      # contents from the repo
+      mode: 0777
+      contents: |
+        apiVersion: 1
+        providers:
+          - name: 'matic-nodes-metrics'
+            orgId: 1
+            folder: ''
+            folderUid: ''
+            type: file
+            disableDeletion: false
+            editable: true
+            updateIntervalSeconds: 10
+            allowUiUpdates: true
+            options:
+              path: /var/lib/grafana/dashboards
+    provisioning-datasources:
+      container: grafana
+      path: /etc/grafana/provisioning/datasources/datasources.yaml
+      mode: 0777
+      # contents from the repo with variables injected:
+      contents: |
+        apiVersion: 1
+        datasources:
+          - name: prometheus
+            type: prometheus
+            access: Browser
+            url: http://{{ v "prometheus-addr" }}:9090
+            isDefault: true
+            version: 1
+            editable: true
+      # this is missing grafana dahsboards as they are yuuuuuuge and would have to be pasted inline
+
+monitoring:
+  defines: process-group
+  runnable-list:
+    - polygon/node-exporter
+    - polygon/prometheus
+    - polygon/grafana
