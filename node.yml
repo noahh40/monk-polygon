@@ -73,13 +73,7 @@ heimdall:
     seeds: "4cd60c1d76e44b05f7dfd8bab3f447b119e87042@54.147.31.250:26656"
     amqp_url: "amqp://guest:guest@rabbitmq:5672"
     eth_rpc_url: "https://polygon-mumbai.infura.io/v3/84495ec72d3d493c98b35fcfb4e9bad8"
-  # check:
-  #   defines: checks
-  #   readiness: 
-  #   # we have an error check because the get might get bounced due to a default timeout so this will pass no matter what 
-  #     code: http-get("http://localhost:26657/status") parse-json get-member("result") get-member("sync_info") get-member("catching_up") if-error(true) not
-  #     period: 10
-  #     initialDelay: 10
+
 
 rabbitmq:
   defines: runnable
@@ -90,6 +84,13 @@ rabbitmq:
       ports:
         - "5672:5672"
       
+heimdall-node:
+  defines: process-group
+  runnable-list:
+    - polygon/heimdall
+    - polygon/rabbitmq
+
+
 bor:
   defines: runnable
   containers:
@@ -151,9 +152,7 @@ bor:
   #     runnables:
   #       - polygon/heimdall
 
-node:
+bor-node:
   defines: process-group
   runnable-list:
-    - polygon/heimdall
-    - polygon/rabbitmq
     - polygon/bor
