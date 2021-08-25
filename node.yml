@@ -145,12 +145,6 @@ bor:
     heimdall-host:
       type: string
       value: <- get-hostname("polygon/heimdall", "rest")
-  # depends:
-  #   defines: depends
-  #   wait-for:
-  #     # timeout: 28800
-  #     runnables:
-  #       - polygon/heimdall
 
 bor-node:
   defines: process-group
