@@ -1,5 +1,10 @@
 namespace: polygon
 
+# There is a bug in this file. The check statement on line 79 
+# and the Depends statement on line 152 are not allowing Bor to start
+# Please use the other two yml files to start a full node or submit a PR 
+# to resolve this issue.   
+
 heimdall:
   defines: runnable
   containers:
