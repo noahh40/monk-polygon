@@ -54,3 +54,6 @@
 
 2. 
     ```Monk run polygon/monitoring```
+
+3. 
+    ```Import json files in dashboards folder to grafana dashboard```
